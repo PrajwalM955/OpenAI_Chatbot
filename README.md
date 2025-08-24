@@ -89,6 +89,8 @@ Want to personalize the bot’s demo mode?
 
 📸 Demo Screenshot
 
+![Demo Screenshot](Capture.PNG)
+
 
 🤝 Contributing
 Got ideas to enhance the chatbot’s personality, add features, or improve error handling?
