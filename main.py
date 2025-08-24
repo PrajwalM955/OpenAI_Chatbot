@@ -1,19 +1,21 @@
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
-from openai.error import OpenAIError, RateLimitError, APIError
+from openai import OpenAI, error
+import time
 
-# Load all API keys from .env
 load_dotenv()
 
-API_KEYS = [
+# Load all API keys from environment variables
+API_KEYS = list(filter(None, [
     os.getenv("OPENAI_API_KEY"),
     os.getenv("OPENAI_API_KEY_1"),
     os.getenv("OPENAI_API_KEY_2"),
-    os.getenv("OPENAI_API_KEY_3")
-]
+    os.getenv("OPENAI_API_KEY_3"),
+]))
 
-# Use lightweight models for demo purposes
+if not API_KEYS:
+    raise ValueError("No OpenAI API keys found in environment variables!")
+
 MODELS = ["gpt-3.5-turbo", "gpt-5-mini", "gpt-5-nano"]
 
 class ChatManager:
@@ -37,42 +39,53 @@ class ChatManager:
 
     def chat(self, prompt):
         attempts = 0
-        while attempts < len(self.keys) * len(self.models):
+        max_attempts = len(self.keys) * len(self.models)
+
+        while attempts < max_attempts:
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=150  # limit token usage for demo
+                    max_tokens=150,
                 )
                 return response.choices[0].message.content.strip()
-            except RateLimitError:
-                print(f"[INFO] Rate limit reached for API index {self.api_index}. Trying next API/model...")
+            except error.RateLimitError:
+                print(f"[INFO] Rate limit reached, trying next API key and model...")
                 self.switch_api()
                 self.switch_model()
                 attempts += 1
-            except APIError as e:
-                print(f"[INFO] API error with API index {self.api_index}: {e}. Trying next API/model...")
+                time.sleep(2)
+            except error.APIError as e:
+                print(f"[INFO] API error occurred: {e}, switching API key and model...")
                 self.switch_api()
                 self.switch_model()
                 attempts += 1
-            except OpenAIError as e:
-                print(f"[INFO] OpenAI error: {e}. Trying next API/model...")
+                time.sleep(2)
+            except error.OpenAIError as e:
+                print(f"[INFO] OpenAI error: {e}, switching API key and model...")
                 self.switch_api()
                 self.switch_model()
                 attempts += 1
+                time.sleep(2)
+            except Exception as e:
+                print(f"[ERROR] Unexpected error: {e}, switching API key and model...")
+                self.switch_api()
+                self.switch_model()
+                attempts += 1
+                time.sleep(2)
 
-        return "[INFO] All API keys/models are currently over quota or failing."
+        return "[INFO] All API keys/models exhausted or over quota."
 
 def main():
     manager = ChatManager(API_KEYS, MODELS)
-    print("Chatbot is running! Type 'quit', 'exit', or 'bye' to stop.")
-    
+    print("Chatbot running! Type 'quit'/'exit'/'bye' to stop.")
+
     while True:
-        user_input = input("You: ")
-        if user_input.lower() in ["quit", "exit", "bye"]:
+        query = input("You: ")
+        if query.lower() in ["quit", "exit", "bye"]:
             break
 
-        response = manager.chat(user_input)
+        response = manager.chat(query)
         print("Chatbot:", response)
 
 if __name__ == "__main__":
